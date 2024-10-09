@@ -150,23 +150,6 @@ def client_all(params):
     data = ''
     return db_select(sql_str, data, params)
 
-def client_all_tel(params):
-    sql_str = "SELECT client.id, name, surname, email FROM client;"
-    data = ''
-    clients_list = db_select(sql_str, data, params)
-    for client in clients_list:
-        client_id = client[0]
-        sql_str = "SELECT number FROM telephon WHERE client_id=%s;"
-        data = (client_id,)
-        number_list = db_select(sql_str, data, params)
-        numbers=[]
-        client_new=[]
-        for number in number_list:
-            numbers.append(number[0])
-            client_new=list(client)
-            client_new.append(numbers)
-    return client_new
-
 def table_print(clients_list):
     my_table = PrettyTable()
     my_table.field_names = ["id", "Имя", "Фамилия", "Почта", "Телефон"]
@@ -213,9 +196,6 @@ if __name__ == '__main__':
 
     print('Список клиентов:')
     table_print(client_all(params))
-
-    # print('Список клиентов:')
-    # client_all = client_all_tel(params)
 
     telephon_delete(params, client_id, number_new)
     print(f'Клиенту {name} удален телефон {number_new}')
