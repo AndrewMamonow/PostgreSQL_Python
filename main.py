@@ -86,47 +86,38 @@ def db_delete(params):
         finally:
             conn.close()
 
-# Функции соединения с базой данных.
-def db_execute(sql_str, data, params):
+# Функция соединения с базой данных.
+def db_execute(sql_str, data, params, type=''):
     with psycopg2.connect(**params) as conn:
         with conn.cursor() as cur:
             cur.execute(sql_str, data)
-    conn.close()
-
-def db_insert(sql_str, data, params):
-    with psycopg2.connect(**params) as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql_str, data)
-            result = cur.fetchone()
-            return result
-    conn.close()
-
-def db_select(sql_str, data, params):
-    with psycopg2.connect(**params) as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql_str, data)
-            result = cur.fetchall()
-            return result
+            if type == 'insert':
+                result = cur.fetchone()
+            elif type == 'select':
+                result = cur.fetchall()
+            else:
+                result = ''
+        return result
     conn.close()
 
 # Функции управления базой данных клиентов.
 def client_add(params, name, surname, email, number=None):
     sql_str = "INSERT INTO client(name, surname, email) VALUES(%s, %s, %s) RETURNING id;"
     data = (name, surname, email)
-    client_id = db_insert(sql_str, data, params)
+    client_id = db_execute(sql_str, data, params, 'insert')
     telephon_add(params, client_id, number)
     return client_id
 
 def telephon_add(params, client_id, number):
     sql_str = "INSERT INTO telephon(client_id, number) VALUES(%s, %s) RETURNING id;"
     data = (client_id, number)
-    telephon_id = db_insert(sql_str, data, params)
+    telephon_id = db_execute(sql_str, data, params, 'insert')
     return telephon_id
 
 def client_update(params, client_id, name, surname, email):
     sql_str = "SELECT name, surname, email FROM client WHERE id=%s;"
     data = (client_id,)
-    clients = db_select(sql_str, data, params)
+    clients = db_execute(sql_str, data, params, 'select')
     data_list = list((name, surname, email))
     for index, data in enumerate(data_list):
         if data is None:
@@ -157,12 +148,12 @@ def client_find(params, name=None, surname=None, email=None, number=None):
     sql_str += "AND (email = %(email)s OR %(email)s IS NULL) "
     sql_str += "AND (number = %(number)s OR %(number)s IS NULL);"
     data = ({"name": name, "surname": surname, "email": email, "number": number})
-    return db_select(sql_str, data, params)
+    return db_execute(sql_str, data, params, 'select')
 
 def client_all(params):
     sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id;"
     data = ''
-    return db_select(sql_str, data, params)
+    return db_execute(sql_str, data, params, 'select')
 
 def table_print(clients_list):
     my_table = PrettyTable()
