@@ -91,7 +91,6 @@ def db_execute(sql_str, data, params):
     with psycopg2.connect(**params) as conn:
         with conn.cursor() as cur:
             cur.execute(sql_str, data)
-            conn.commit()
     conn.close()
 
 def db_insert(sql_str, data, params):
