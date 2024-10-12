@@ -152,15 +152,13 @@ def client_delete(params, client_id):
     db_execute(sql_str, data, params)
 
 def client_find(params, name=None, surname=None, email=None, number=None):
-    data_list = list((name, surname, email, number))
-    for index, data in enumerate(data_list):
-        if data is None:
-            data_list[index] = '%'
-        else:
-            data_list[index] = '%' + data + '%'
     sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id "
-    sql_str += "WHERE name ILIKE %s AND surname ILIKE %s AND email ILIKE %s AND number ILIKE %s;"
-    return db_select(sql_str, data_list, params)
+    sql_str += "WHERE (name = %(name)s OR %(name)s IS NULL) "
+    sql_str += "AND (surname = %(surname)s OR %(surname)s IS NULL) "
+    sql_str += "AND (email = %(email)s OR %(email)s IS NULL) "
+    sql_str += "AND (number = %(number)s OR %(number)s IS NULL);"
+    data = ({"name": name, "surname": surname, "email": email, "number": number})
+    return db_select(sql_str, data, params)
 
 def client_all(params):
     sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id;"
