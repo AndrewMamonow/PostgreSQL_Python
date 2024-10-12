@@ -4,7 +4,7 @@ from psycopg2 import sql
 from prettytable import PrettyTable
 
 
-def config(filename='database.ini', section='postgresql'):
+def config(filename:str='database.ini', section:str='postgresql'):
 # Параметры подключения к серверу из файла database.ini
     parser = configparser.ConfigParser()
     parser.read(filename)
@@ -20,14 +20,14 @@ def config(filename='database.ini', section='postgresql'):
         raise Exception('Раздел {0} не найден в файле {1}'.format(section, filename))
     return db
 
-def server_test(params):
+def server_test(params:dict):
 # Проверка подключения к серверу
     try:
         conn = psycopg2.connect(user=params['user'], password=params['password'], host=params['host'], port=params['port'])
     except:
         raise Exception(f'Нет подключения к серверу. Проверьте параметры.')
 
-def db_test(params):
+def db_test(params:dict):
 # Проверка базы данных
     database = params['database'] 
     with psycopg2.connect(user=params['user'], password=params['password']) as conn:
@@ -38,7 +38,7 @@ def db_test(params):
             return cur.fetchone()
     conn.close()
 
-def db_create(params):
+def db_create(params:dict):
 # Создание базы данных и 2-х таблиц client и telephon
     database = params['database']   
     if db_test(params) == None:
@@ -87,7 +87,7 @@ def db_delete(params):
             conn.close()
 
 # Функция соединения с базой данных.
-def db_execute(sql_str, data, params, type=''):
+def db_execute(sql_str:str, data:tuple, params:dict, type:str=''):
     with psycopg2.connect(**params) as conn:
         with conn.cursor() as cur:
             cur.execute(sql_str, data)
@@ -101,20 +101,20 @@ def db_execute(sql_str, data, params, type=''):
     conn.close()
 
 # Функции управления базой данных клиентов.
-def client_add(params, name, surname, email, number=None):
+def client_add(params:dict, name:str, surname:str, email:str, number:str=None):
     sql_str = "INSERT INTO client(name, surname, email) VALUES(%s, %s, %s) RETURNING id;"
     data = (name, surname, email)
     client_id = db_execute(sql_str, data, params, 'insert')
     telephon_add(params, client_id, number)
     return client_id
 
-def telephon_add(params, client_id, number):
+def telephon_add(params:dict, client_id:str, number:str):
     sql_str = "INSERT INTO telephon(client_id, number) VALUES(%s, %s) RETURNING id;"
     data = (client_id, number)
     telephon_id = db_execute(sql_str, data, params, 'insert')
     return telephon_id
 
-def client_update(params, client_id, name, surname, email):
+def client_update(params:dict, client_id:str, name:str, surname:str, email:str):
     sql_str = "SELECT name, surname, email FROM client WHERE id=%s;"
     data = (client_id,)
     clients = db_execute(sql_str, data, params, 'select')
@@ -126,22 +126,22 @@ def client_update(params, client_id, name, surname, email):
     data_list.append(client_id)
     db_execute(sql_str, data_list, params)
    
-def telephon_update(params, client_id, number, number_new):
+def telephon_update(params:dict, client_id:str, number:str, number_new:str):
     sql_str = "UPDATE telephon SET number=%s WHERE number=%s AND client_id=%s;"
     data = (number_new, number, client_id)
     db_execute(sql_str, data, params)
 
-def telephon_delete(params, client_id, number):
+def telephon_delete(params:dict, client_id:str, number:str):
     sql_str = "DELETE FROM telephon WHERE number=%s AND client_id=%s;"
     data = (number, client_id)
     db_execute(sql_str, data, params)
 
-def client_delete(params, client_id):
+def client_delete(params:dict, client_id:str):
     sql_str = "DELETE FROM client WHERE id=%s;"
     data = (client_id,)
     db_execute(sql_str, data, params)
 
-def client_find(params, name=None, surname=None, email=None, number=None):
+def client_find(params:dict, name:str=None, surname:str=None, email:str=None, number:str=None):
     sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id "
     sql_str += "WHERE (name = %(name)s OR %(name)s IS NULL) "
     sql_str += "AND (surname = %(surname)s OR %(surname)s IS NULL) "
@@ -150,12 +150,12 @@ def client_find(params, name=None, surname=None, email=None, number=None):
     data = ({"name": name, "surname": surname, "email": email, "number": number})
     return db_execute(sql_str, data, params, 'select')
 
-def client_all(params):
+def client_all(params:dict):
     sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id;"
     data = ''
     return db_execute(sql_str, data, params, 'select')
 
-def table_print(clients_list):
+def table_print(clients_list:list):
     my_table = PrettyTable()
     my_table.field_names = ["id", "Имя", "Фамилия", "Почта", "Телефон"]
     for client in clients_list:
