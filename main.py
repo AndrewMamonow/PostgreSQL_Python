@@ -1,5 +1,6 @@
 import psycopg2
 import configparser
+from psycopg2 import sql
 from prettytable import PrettyTable
 
 
@@ -22,25 +23,29 @@ def config(filename='database.ini', section='postgresql'):
 def server_test(params):
 # Проверка подключения к серверу
     try:
-        conn = psycopg2.connect(user=params['user'], password=params['password'])
+        conn = psycopg2.connect(user=params['user'], password=params['password'], host=params['host'], port=params['port'])
     except:
         raise Exception(f'Нет подключения к серверу. Проверьте параметры.')
 
 def db_test(params):
 # Проверка базы данных
+    database = params['database'] 
     with psycopg2.connect(user=params['user'], password=params['password']) as conn:
         with conn.cursor() as cur:
-            cur.execute(f"SELECT 1 FROM pg_database WHERE datname='{params['database']}'")
+            sql_str = sql.SQL("SELECT 1 FROM pg_database WHERE datname=%s;")
+            data = (database,)
+            cur.execute(sql_str, data)
             return cur.fetchone()
+    conn.close()
 
 def db_create(params):
-# Создание базы данных и таблиц client и telephon
+# Создание базы данных и 2-х таблиц client и telephon
     database = params['database']   
     if db_test(params) == None:
         conn = psycopg2.connect(database="postgres", user=params['user'], password=params['password'])
         conn.autocommit = True
         cur = conn.cursor()
-        sql_str = "CREATE database " + database + ";"
+        sql_str = sql.SQL("CREATE database {database};").format(database = sql.Identifier(database),)
         try:
             cur.execute(sql_str)
             result = f'База данных {database} создана на сервере.'
@@ -61,7 +66,7 @@ def db_create(params):
     sql_str = "CREATE TABLE IF NOT EXISTS telephon"
     sql_str +="(id SERIAL PRIMARY KEY, "
     sql_str +="number VARCHAR(50), "
-    sql_str +="client_id integer NOT NULL REFERENCES client(id));"
+    sql_str +="client_id integer NOT NULL REFERENCES client(id) ON DELETE CASCADE);"
     db_execute(sql_str, '', params)
     return result
 
@@ -72,7 +77,7 @@ def db_delete(params):
         cur = conn.cursor()
         database = params['database']
         cur.execute("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = %s;", (database,))
-        sql_str = "DROP database IF EXISTS " + database + ";"
+        sql_str = sql.SQL("DROP database IF EXISTS {database};").format(database = sql.Identifier(database),)
         try:
             cur.execute(sql_str)
             return f'База данных {database} удалена на сервере.'
@@ -87,13 +92,15 @@ def db_execute(sql_str, data, params):
         with conn.cursor() as cur:
             cur.execute(sql_str, data)
             conn.commit()
-    
+    conn.close()
+
 def db_insert(sql_str, data, params):
     with psycopg2.connect(**params) as conn:
         with conn.cursor() as cur:
             cur.execute(sql_str, data)
             result = cur.fetchone()
             return result
+    conn.close()
 
 def db_select(sql_str, data, params):
     with psycopg2.connect(**params) as conn:
@@ -101,6 +108,7 @@ def db_select(sql_str, data, params):
             cur.execute(sql_str, data)
             result = cur.fetchall()
             return result
+    conn.close()
 
 # Функции управления базой данных клиентов.
 def client_add(params, name, surname, email, number=None):
@@ -116,12 +124,18 @@ def telephon_add(params, client_id, number):
     telephon_id = db_insert(sql_str, data, params)
     return telephon_id
 
-def client_update(params, client_id, name, surname, email, number=None):
+def client_update(params, client_id, name, surname, email):
+    sql_str = "SELECT name, surname, email FROM client WHERE id=%s;"
+    data = (client_id,)
+    clients = db_select(sql_str, data, params)
+    data_list = list((name, surname, email))
+    for index, data in enumerate(data_list):
+        if data is None:
+            data_list[index] = clients[0][index]
     sql_str = "UPDATE client SET name=%s, surname=%s, email=%s WHERE id=%s;"
-    data = (name, surname, email, client_id)
-    db_execute(sql_str, data, params)
-    telephon_update(params, client_id, number, number)
-
+    data_list.append(client_id)
+    db_execute(sql_str, data_list, params)
+   
 def telephon_update(params, client_id, number, number_new):
     sql_str = "UPDATE telephon SET number=%s WHERE number=%s AND client_id=%s;"
     data = (number_new, number, client_id)
@@ -133,17 +147,20 @@ def telephon_delete(params, client_id, number):
     db_execute(sql_str, data, params)
 
 def client_delete(params, client_id):
-    sql_str = "DELETE FROM telephon WHERE client_id=%s;"
-    data = (client_id,)
-    db_execute(sql_str, data, params)
     sql_str = "DELETE FROM client WHERE id=%s;"
+    data = (client_id,)
     db_execute(sql_str, data, params)
 
 def client_find(params, name=None, surname=None, email=None, number=None):
+    data_list = list((name, surname, email, number))
+    for index, data in enumerate(data_list):
+        if data is None:
+            data_list[index] = '%'
+        else:
+            data_list[index] = '%' + data + '%'
     sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id "
-    sql_str += "WHERE name=%s OR surname=%s OR email=%s OR number=%s;"
-    data = (name, surname, email, number)
-    return db_select(sql_str, data, params)
+    sql_str += "WHERE name ILIKE %s AND surname ILIKE %s AND email ILIKE %s AND number ILIKE %s;"
+    return db_select(sql_str, data_list, params)
 
 def client_all(params):
     sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id;"
@@ -161,7 +178,7 @@ if __name__ == '__main__':
 # Программа для демонстрации функций управления базой данных в виде сценария.
     params = config('database.ini', 'postgresql')
     server_test(params)
-    # db_delete(params)
+    db_delete(params)
     print('Создание базы данных')
     print(db_create(params))
 
@@ -182,29 +199,52 @@ if __name__ == '__main__':
     client_id = client_add(params, name, surname, email, number)
     print(f'Клиент {name} {surname} добавлен')
 
-    number = '1113'
-    telephon_id = telephon_add(params, client_id, number)
-    print(f'Клиенту {name} добавлен телефон {number}')
-
+    name = 'Name_3'
+    surname = 'Surname_3'
     email = 'Name_3@mail.ru'
-    client_update(params, client_id, name, surname, email, number)
-    print(f'Клиенту {name} изменена почта на {email}')
+    number = '1113'
 
-    number_new = '1114'
+    client_id = client_add(params, name, surname, email, number)
+    print(f'Клиент {name} {surname} добавлен')
+
+    client_id = '3'
+    number = '1114'
+    telephon_id = telephon_add(params, client_id, number)
+    print(f'Клиенту {client_id} добавлен телефон {number}')
+
+    client_id = '3'
+    name = None
+    surname = 'Surname_4'
+    email = None
+    number = None
+
+    client_update(params, client_id, name, surname, email)
+    print(f'Клиенту {client_id} изменена фамилия на {surname}')
+
+    client_id = '3'
+    number = '1114'
+    number_new = '1115'
     telephon_update(params, client_id, number, number_new)
-    print(f'Клиенту {name} изменен телефон {number} на {number_new}')
+    print(f'Клиенту {client_id} изменен телефон {number} на {number_new}')
 
     print('Список клиентов:')
     table_print(client_all(params))
 
-    telephon_delete(params, client_id, number_new)
-    print(f'Клиенту {name} удален телефон {number_new}')
-
-    print(f'Поиск клиента по имени {name}')
+    client_id = None
+    surname = 'Surname_4'
+    email = None
+    number = None
+    print(f'Поиск клиента по по его данным: {name} {surname} {email} {number}')
     table_print(client_find(params, name, surname, email, number))
-    
+
+    client_id = '3'
+    number = '1115'
+    telephon_delete(params, client_id, number)
+    print(f'Клиенту {client_id} удален телефон {number}')
+
+    client_id = '3'
     client_delete(params, client_id)
-    print(f'Клиент {name} удален')
+    print(f'Клиент {client_id} удален')
 
     print('Список клиентов:')
     table_print(client_all(params))
