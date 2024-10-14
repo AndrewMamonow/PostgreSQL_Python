@@ -56,17 +56,15 @@ def db_create(params:dict):
     else:
         result = f'База данных {database} уже есть на сервере.'
         
-    sql_str = "CREATE TABLE IF NOT EXISTS client"
-    sql_str +="(id SERIAL PRIMARY KEY, "
-    sql_str +="name VARCHAR(50) NOT NULL, "
-    sql_str +="surname VARCHAR(50) NOT NULL, "
-    sql_str +="email VARCHAR(50) UNIQUE NOT NULL);"
+    sql_str = ("CREATE TABLE IF NOT EXISTS client(id SERIAL PRIMARY KEY,\
+                name VARCHAR(50) NOT NULL, \
+                surname VARCHAR(50) NOT NULL, \
+                email VARCHAR(50) UNIQUE NOT NULL);")
     db_execute(sql_str, '', params)
 
-    sql_str = "CREATE TABLE IF NOT EXISTS telephon"
-    sql_str +="(id SERIAL PRIMARY KEY, "
-    sql_str +="number VARCHAR(50), "
-    sql_str +="client_id integer NOT NULL REFERENCES client(id) ON DELETE CASCADE);"
+    sql_str = "CREATE TABLE IF NOT EXISTS telephon(id SERIAL PRIMARY KEY, \
+                number VARCHAR(50), \
+                client_id integer NOT NULL REFERENCES client(id) ON DELETE CASCADE);"
     db_execute(sql_str, '', params)
     return result
 
@@ -118,7 +116,7 @@ def client_update(params:dict, client_id:str, name:str, surname:str, email:str):
     sql_str = "SELECT name, surname, email FROM client WHERE id=%s;"
     data = (client_id,)
     clients = db_execute(sql_str, data, params, 'select')
-    data_list = list((name, surname, email))
+    data_list = (name, surname, email)
     new_list = [clients[0][index] if data is None else data_list[index] for index, data in enumerate(data_list)]
     sql_str = "UPDATE client SET name=%s, surname=%s, email=%s WHERE id=%s;"
     new_list.append(client_id)
@@ -140,13 +138,11 @@ def client_delete(params:dict, client_id:str):
     db_execute(sql_str, data, params)
 
 def client_find(params:dict, name:str=None, surname:str=None, email:str=None, number:str=None):
-    sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id "
-    sql_str += "WHERE (name = %(name)s OR %(name)s IS NULL) "
-    sql_str += "AND (surname = %(surname)s OR %(surname)s IS NULL) "
-    sql_str += "AND (email = %(email)s OR %(email)s IS NULL) "
-    sql_str += "AND (number = %(number)s OR %(number)s IS NULL);"
-    data = ({"name": name, "surname": surname, "email": email, "number": number})
-    return db_execute(sql_str, data, params, 'select')
+    data_list = (name, surname, email, number)
+    new_list = ['%' if data is None else '%' + data + '%' for index, data in enumerate(data_list)]
+    sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id \n"        
+    "WHERE name ILIKE %s AND surname ILIKE %s AND email ILIKE %s AND number ILIKE %s;"
+    return db_execute(sql_str, new_list, params, 'select')
 
 def client_all(params:dict):
     sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id;"
