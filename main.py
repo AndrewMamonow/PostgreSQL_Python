@@ -119,12 +119,10 @@ def client_update(params:dict, client_id:str, name:str, surname:str, email:str):
     data = (client_id,)
     clients = db_execute(sql_str, data, params, 'select')
     data_list = list((name, surname, email))
-    for index, data in enumerate(data_list):
-        if data is None:
-            data_list[index] = clients[0][index]
+    new_list = [clients[0][index] if data is None else data_list[index] for index, data in enumerate(data_list)]
     sql_str = "UPDATE client SET name=%s, surname=%s, email=%s WHERE id=%s;"
-    data_list.append(client_id)
-    db_execute(sql_str, data_list, params)
+    new_list.append(client_id)
+    db_execute(sql_str, new_list, params)
    
 def telephon_update(params:dict, client_id:str, number:str, number_new:str):
     sql_str = "UPDATE telephon SET number=%s WHERE number=%s AND client_id=%s;"
@@ -160,7 +158,7 @@ def table_print(clients_list:list):
     my_table.field_names = ["id", "Имя", "Фамилия", "Почта", "Телефон"]
     for client in clients_list:
         my_table.add_row(client)
-    print(my_table)
+    return my_table
 
 if __name__ == '__main__':
 # Программа для демонстрации функций управления базой данных в виде сценария.
@@ -216,14 +214,14 @@ if __name__ == '__main__':
     print(f'Клиенту {client_id} изменен телефон {number} на {number_new}')
 
     print('Список клиентов:')
-    table_print(client_all(params))
+    print(table_print(client_all(params)))
 
     client_id = None
     surname = 'Surname_4'
     email = None
-    number = None
+    number = '1115'
     print(f'Поиск клиента по по его данным: {name} {surname} {email} {number}')
-    table_print(client_find(params, name, surname, email, number))
+    print(table_print(client_find(params, name, surname, email, number)))
 
     client_id = '3'
     number = '1115'
@@ -235,7 +233,7 @@ if __name__ == '__main__':
     print(f'Клиент {client_id} удален')
 
     print('Список клиентов:')
-    table_print(client_all(params))
+    print(table_print(client_all(params)))
 
     print('Удаление базы данных:')
     print(db_delete(params))
