@@ -140,8 +140,8 @@ def client_delete(params:dict, client_id:str):
 def client_find(params:dict, name:str=None, surname:str=None, email:str=None, number:str=None):
     data_list = (name, surname, email, number)
     new_list = ['%' if data is None else '%' + data + '%' for index, data in enumerate(data_list)]
-    sql_str = "SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id \n"        
-    "WHERE name ILIKE %s AND surname ILIKE %s AND email ILIKE %s AND number ILIKE %s;"
+    sql_str = ("SELECT client.id, name, surname, email, number FROM client LEFT JOIN telephon ON telephon.client_id=client.id \
+                WHERE name ILIKE %s AND surname ILIKE %s AND email ILIKE %s AND number ILIKE %s;")
     return db_execute(sql_str, new_list, params, 'select')
 
 def client_all(params:dict):
